@@ -25,34 +25,44 @@ industry = st.selectbox(
     ("Auto-Detect", "Retail", "Manufacturing", "EPC", "Distribution")
 )
 
-# 4. Search Execution (STABLE VERSION)
+# 4. Search Execution (THE SMART AUTO-DETECT VERSION)
 if st.button("Generate Battle Card"):
     if not company_name:
         st.error("Please enter a company name.")
     else:
-        with st.spinner('Analyzing industry data...'):
-            # WE REMOVED THE "TOOLS" LINE - This is the fix!
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            
-            loc = f"in {city}" if city else "at their National Headquarters"
-            
-            prompt = f"""
-            Act as a B2B Sales Intelligence Expert. 
-            Analyze the company '{company_name}' {loc} in the {industry} sector.
-            
-            Provide:
-            1. Likely Names/Roles of Decision Makers (MD, CEO, IT Head).
-            2. Business Scale & Presence.
-            3. 3 Strategic 'Hooks' for a Presales meeting.
-            
-            Format clearly with Bold Headings.
-            """
-            
+        with st.spinner('Bypassing API locks and finding a working AI model...'):
             try:
-                # Direct call without the search retrieval tool
-                response = model.generate_content(prompt)
-                st.success("Analysis Complete!")
-                st.markdown(response.text)
-                st.download_button("Download Report", response.text, file_name=f"{company_name}_Report.txt")
+                # DYNAMIC MODEL FINDER: This stops the 404 error forever.
+                available_model = None
+                for m in genai.list_models():
+                    if 'generateContent' in m.supported_generation_methods:
+                        available_model = m.name
+                        if '1.5-flash' in m.name: 
+                            break # It found the best one, stop searching
+                
+                if not available_model:
+                    st.error("Your API key is active, but Google hasn't unlocked any text models for it yet.")
+                else:
+                    # Use the model it just discovered
+                    model = genai.GenerativeModel(available_model)
+                    
+                    loc = f"in {city}" if city else "at their National Headquarters"
+                    
+                    prompt = f"""
+                    Act as a B2B Sales Intelligence Expert. 
+                    Analyze the company '{company_name}' {loc} in the {industry} sector.
+                    
+                    Provide:
+                    1. Likely Names/Roles of Decision Makers (MD, CEO, IT Head).
+                    2. Business Scale & Presence.
+                    3. 3 Strategic 'Hooks' for a Presales meeting.
+                    
+                    Format clearly with Bold Headings.
+                    """
+                    
+                    response = model.generate_content(prompt)
+                    st.success(f"Report Ready! (Successfully connected to: {available_model})")
+                    st.markdown(response.text)
+                    
             except Exception as e:
-                st.error(f"Error: {e}. Try changing model name to 'gemini-pro' in code.")
+                st.error(f"System Error: {e}")
