@@ -6,7 +6,7 @@ try:
     API_KEY = st.secrets["GEMINI_KEY"]
     genai.configure(api_key=API_KEY)
 except:
-    st.error("API Key not found. Please configure it in Streamlit Secrets.")
+    st.error("API Key not found in Streamlit Secrets.")
 
 # 2. Page Interface
 st.set_page_config(page_title="PreSales IQ", layout="centered")
@@ -25,33 +25,34 @@ industry = st.selectbox(
     ("Auto-Detect", "Retail", "Manufacturing", "EPC", "Distribution")
 )
 
-# 4. Search Execution (Updated Fix)
+# 4. Search Execution (STABLE VERSION)
 if st.button("Generate Battle Card"):
     if not company_name:
         st.error("Please enter a company name.")
     else:
-        with st.spinner('Scouting the web for KDMs...'):
-            # We use the standard model without the specific 'search' tool to avoid the 404 error
-            model = genai.GenerativeModel('gemini-1.5-pro')
+        with st.spinner('Analyzing industry data...'):
+            # WE REMOVED THE "TOOLS" LINE - This is the fix!
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
             loc = f"in {city}" if city else "at their National Headquarters"
             
-            # We give the AI clear instructions to use its internal knowledge + browsing
             prompt = f"""
-            Act as a Lead Intelligence Specialist. 
-            Research the company '{company_name}' {loc} within the {industry} sector.
+            Act as a B2B Sales Intelligence Expert. 
+            Analyze the company '{company_name}' {loc} in the {industry} sector.
             
-            Find and provide:
-            1. Likely names and LinkedIn roles for the MD, CEO, or IT Head.
-            2. Company scale (number of employees or stores).
-            3. A 'Ginesys-style' pitch: Why do they need retail/distribution automation?
+            Provide:
+            1. Likely Names/Roles of Decision Makers (MD, CEO, IT Head).
+            2. Business Scale & Presence.
+            3. 3 Strategic 'Hooks' for a Presales meeting.
             
-            Format the output with bold headings and bullet points.
+            Format clearly with Bold Headings.
             """
             
             try:
+                # Direct call without the search retrieval tool
                 response = model.generate_content(prompt)
-                st.success("Report Ready!")
+                st.success("Analysis Complete!")
                 st.markdown(response.text)
+                st.download_button("Download Report", response.text, file_name=f"{company_name}_Report.txt")
             except Exception as e:
-                st.error(f"Something went wrong: {e}")
+                st.error(f"Error: {e}. Try changing model name to 'gemini-pro' in code.")
