@@ -1,4 +1,4 @@
 google-generativeai
 streamlit
-duckduckgo-search
 requests
+serpapi
