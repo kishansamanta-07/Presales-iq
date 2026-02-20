@@ -1,20 +1,20 @@
 import streamlit as st
 import google.generativeai as genai
 import requests
-from duckduckgo_search import DDGS
 
 # 1. API Setup from Secrets
 try:
-    GEMINI_KEY = st.secrets["GEMINI_KEY"]
+    GEMINI_KEY = st.secrets.get("GEMINI_KEY", "")
     APOLLO_KEY = st.secrets.get("APOLLO_KEY", "")
     HUNTER_KEY = st.secrets.get("HUNTER_KEY", "")
+    SERPAPI_KEY = st.secrets.get("SERPAPI_KEY", "")
     genai.configure(api_key=GEMINI_KEY)
 except Exception as e:
-    st.error("Gemini API Key not found in Streamlit Secrets.")
+    st.error("Secrets configuration error.")
 
 st.set_page_config(page_title="PreSales IQ", layout="centered")
 st.title("🚀 PreSales IQ")
-st.markdown("### Live Web & Contact Intelligence Engine")
+st.markdown("### Powered by Google Search & Live Contact APIs")
 
 # 2. Search Inputs
 st.markdown("**Step 1: Company Intelligence**")
@@ -34,12 +34,22 @@ with col4:
     domain = st.text_input("Company Domain", placeholder="e.g. manyavar.com")
 
 # 3. Helper Functions
-def get_live_web_data(query):
+def get_live_google_data(query, api_key):
+    if not api_key:
+        return "SerpApi Key missing. Add to Streamlit Secrets to enable Google Search."
     try:
-        results = DDGS().text(query, max_results=3)
-        return "\n".join([r['body'] for r in results])
-    except:
-        return "Live search failed."
+        import serpapi
+        client = serpapi.Client(api_key=api_key)
+        res = client.search({'engine': 'google', 'q': query, 'num': 3})
+        
+        snippets = []
+        if 'organic_results' in res:
+            for r in res['organic_results'][:3]:
+                if 'snippet' in r:
+                    snippets.append(r['snippet'])
+        return "\n".join(snippets) if snippets else "No detailed data found on Google."
+    except Exception as e:
+        return f"Google Search failed: {e}"
 
 def get_waterfall_contact(name, company_domain, apollo_key, hunter_key):
     contact_info = {"phone": "Not Found", "email": "Not Found", "source": "None"}
@@ -79,14 +89,14 @@ if st.button("Generate Battle Card"):
     if not company_name:
         st.error("Please enter a company name.")
     else:
-        with st.spinner('Hunting for data...'):
+        with st.spinner('Querying Google and Contact Databases...'):
             contact_data_string = ""
             if target_name and domain:
                 c_info = get_waterfall_contact(target_name, domain, APOLLO_KEY, HUNTER_KEY)
                 contact_data_string = f"\nVERIFIED CONTACT FOUND:\n- Target: {target_name}\n- Email: {c_info['email']}\n- Phone: {c_info['phone']}\n- Data Source: {c_info['source']}\n"
             
             search_query = f"{company_name} {city} {industry} headquarters CEO"
-            live_data = get_live_web_data(search_query)
+            live_data = get_live_google_data(search_query, SERPAPI_KEY)
 
             try:
                 safe_model = None
@@ -101,11 +111,11 @@ if st.button("Generate Battle Card"):
                     Act as a B2B Sales Intelligence Expert. 
                     Analyze '{company_name}' ({city}, {industry}).
                     
-                    LIVE WEB DATA: {live_data}
+                    LIVE GOOGLE DATA: {live_data}
                     {contact_data_string}
                     
                     Provide a Battle Card:
-                    1. Verified Decision Makers (from the web data).
+                    1. Verified Decision Makers (from the Google data).
                     2. Verified Scale/Presence.
                     3. Direct Contact Info (If VERIFIED CONTACT FOUND is listed above, print it exactly. If not, suggest the likely corporate email pattern).
                     4. 3 Strategic 'Hooks' for a Presales meeting.
