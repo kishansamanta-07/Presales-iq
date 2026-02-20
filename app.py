@@ -25,26 +25,29 @@ industry = st.selectbox(
     ("Auto-Detect", "Retail", "Manufacturing", "EPC", "Distribution")
 )
 
-# 4. Search Execution (THE SMART AUTO-DETECT VERSION)
+# 4. Search Execution (WITH SMART FILTER)
 if st.button("Generate Battle Card"):
     if not company_name:
         st.error("Please enter a company name.")
     else:
-        with st.spinner('Bypassing API locks and finding a working AI model...'):
+        with st.spinner('Selecting a safe, free-tier AI model...'):
             try:
-                # DYNAMIC MODEL FINDER: This stops the 404 error forever.
-                available_model = None
+                # SMART FILTER: Only grab standard Gemini models, ignore restricted ones
+                safe_model = None
                 for m in genai.list_models():
                     if 'generateContent' in m.supported_generation_methods:
-                        available_model = m.name
-                        if '1.5-flash' in m.name: 
-                            break # It found the best one, stop searching
+                        name = m.name.lower()
+                        # Must be a Gemini model, but NOT a preview, vision, or research model
+                        if 'gemini' in name and 'preview' not in name and 'research' not in name and 'vision' not in name:
+                            safe_model = m.name
+                            if 'flash' in name: # Prefer the flash model as it is the fastest
+                                break 
                 
-                if not available_model:
-                    st.error("Your API key is active, but Google hasn't unlocked any text models for it yet.")
+                if not safe_model:
+                    st.error("No free-tier text models available on this API key.")
                 else:
-                    # Use the model it just discovered
-                    model = genai.GenerativeModel(available_model)
+                    # Use the safe model it just discovered
+                    model = genai.GenerativeModel(safe_model)
                     
                     loc = f"in {city}" if city else "at their National Headquarters"
                     
@@ -61,7 +64,7 @@ if st.button("Generate Battle Card"):
                     """
                     
                     response = model.generate_content(prompt)
-                    st.success(f"Report Ready! (Successfully connected to: {available_model})")
+                    st.success(f"Report Ready! (Successfully used: {safe_model})")
                     st.markdown(response.text)
                     
             except Exception as e:
