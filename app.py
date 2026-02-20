@@ -13,7 +13,7 @@ except Exception as e:
     st.error("Secrets configuration error.")
 
 st.set_page_config(page_title="Sales IQ", layout="centered")
-st.title("🚀 PreSales IQ")
+st.title("🚀 Sales IQ")
 st.markdown("### Powered by Kishan & Soumik's IQ")
 
 # 2. Search Inputs
