@@ -32,7 +32,7 @@ if st.button("Generate Battle Card"):
     else:
         with st.spinner('Scouting the web for KDMs...'):
             # We use the standard model without the specific 'search' tool to avoid the 404 error
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model = genai.GenerativeModel('gemini-pro')
             
             loc = f"in {city}" if city else "at their National Headquarters"
             
