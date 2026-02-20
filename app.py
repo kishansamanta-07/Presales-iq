@@ -12,9 +12,9 @@ try:
 except Exception as e:
     st.error("Secrets configuration error.")
 
-st.set_page_config(page_title="PreSales IQ", layout="centered")
+st.set_page_config(page_title="Sales IQ", layout="centered")
 st.title("🚀 PreSales IQ")
-st.markdown("### Powered by Google Search & Live Contact APIs")
+st.markdown("### Powered by Kishan & Soumik's IQ")
 
 # 2. Search Inputs
 st.markdown("**Step 1: Company Intelligence**")
