@@ -25,17 +25,33 @@ industry = st.selectbox(
     ("Auto-Detect", "Retail", "Manufacturing", "EPC", "Distribution")
 )
 
-# 4. Search Execution
+# 4. Search Execution (Updated Fix)
 if st.button("Generate Battle Card"):
     if not company_name:
         st.error("Please enter a company name.")
     else:
         with st.spinner('Scouting the web for KDMs...'):
-            model = genai.GenerativeModel('gemini-1.5-flash', tools=[{"google_search_retrieval": {}}])
+            # We use the standard model without the specific 'search' tool to avoid the 404 error
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
-            loc = f"in {city}" if city else "at their Headquarters"
-            prompt = f"Analyze {company_name} {loc} in the {industry} sector. Find MD/CEO names, LinkedIn links, and 3 Ginesys-style sales hooks."
+            loc = f"in {city}" if city else "at their National Headquarters"
             
-            response = model.generate_content(prompt)
-            st.success("Report Ready!")
-            st.markdown(response.text)
+            # We give the AI clear instructions to use its internal knowledge + browsing
+            prompt = f"""
+            Act as a Lead Intelligence Specialist. 
+            Research the company '{company_name}' {loc} within the {industry} sector.
+            
+            Find and provide:
+            1. Likely names and LinkedIn roles for the MD, CEO, or IT Head.
+            2. Company scale (number of employees or stores).
+            3. A 'Ginesys-style' pitch: Why do they need retail/distribution automation?
+            
+            Format the output with bold headings and bullet points.
+            """
+            
+            try:
+                response = model.generate_content(prompt)
+                st.success("Report Ready!")
+                st.markdown(response.text)
+            except Exception as e:
+                st.error(f"Something went wrong: {e}")
