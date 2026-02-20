@@ -158,6 +158,14 @@ if st.button("Generate Battle Card"):
                     response = model.generate_content(prompt)
                     st.success(f"Deep Vertical Report Ready! (Tailored for {industry})")
                     st.markdown(response.text)
+                    # --- THE NEW DOWNLOAD BUTTON ---
+                    pdf_bytes = create_pdf(response.text, company_name)
+                    st.download_button(
+                        label="📄 Download PDF Report",
+                        data=pdf_bytes,
+                        file_name=f"{company_name.replace(' ', '_')}_PreSales_IQ.pdf",
+                        mime="application/pdf"
+                    )
                 else:
                     st.error("No compatible model found.")
             except Exception as e:
