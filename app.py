@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 import requests
+from fpdf import FPDF
 
 # 1. API Setup from Secrets
 try:
@@ -12,9 +13,9 @@ try:
 except Exception as e:
     st.error("Secrets configuration error.")
 
-st.set_page_config(page_title="Sales IQ", layout="centered")
-st.title("🚀 Sales IQ")
-st.markdown("### Powered by Kishan & Soumik's IQ")
+st.set_page_config(page_title="Einstein's IQ", layout="centered")
+st.title("🚀 Einstein's IQ")
+st.markdown("### Powered by Kishan & Soumik")
 
 # 2. Search Inputs
 st.markdown("**Step 1: Company Intelligence**")
@@ -24,7 +25,6 @@ with col1:
 with col2:
     city = st.text_input("City (Optional)", placeholder="e.g. Mumbai")
 
-# --- THE UPDATED INDUSTRY DROPDOWN ---
 industry = st.selectbox(
     "Select Industry Filter", 
     ("Auto-Detect", "Retail", "Manufacturing", "Distribution", "EPC", "Healthcare")
@@ -40,17 +40,12 @@ with col4:
 # 3. Helper Functions
 def get_live_google_data(query, api_key):
     if not api_key:
-        return "SerpApi Key missing. Add to Streamlit Secrets to enable Google Search."
+        return "SerpApi Key missing."
     try:
         import serpapi
         client = serpapi.Client(api_key=api_key)
         res = client.search({'engine': 'google', 'q': query, 'num': 3})
-        
-        snippets = []
-        if 'organic_results' in res:
-            for r in res['organic_results'][:3]:
-                if 'snippet' in r:
-                    snippets.append(r['snippet'])
+        snippets = [r['snippet'] for r in res.get('organic_results', [])[:3] if 'snippet' in r]
         return "\n".join(snippets) if snippets else "No detailed data found on Google."
     except Exception as e:
         return f"Google Search failed: {e}"
@@ -58,7 +53,7 @@ def get_live_google_data(query, api_key):
 def get_waterfall_contact(name, company_domain, apollo_key, hunter_key):
     contact_info = {"phone": "Not Found", "email": "Not Found", "source": "None"}
     if not apollo_key or not hunter_key:
-        return {"phone": "API Keys Missing", "email": "API Keys Missing", "source": "Add keys to Streamlit Secrets"}
+        return contact_info
 
     parts = name.split()
     first_name = parts[0] if parts else ""
@@ -86,6 +81,25 @@ def get_waterfall_contact(name, company_domain, apollo_key, hunter_key):
             
     return contact_info
 
+# --- NEW PDF GENERATOR FUNCTION ---
+def create_pdf(report_text, company):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(200, 10, txt=f"PreSales IQ Report: {company}", ln=True, align='C')
+    pdf.ln(10)
+    
+    pdf.set_font("Arial", size=11)
+    
+    # Clean text to prevent PDF errors (remove markdown stars and emojis)
+    clean_text = report_text.replace('**', '') 
+    clean_text = clean_text.encode('latin-1', 'replace').decode('latin-1')
+    
+    for line in clean_text.split('\n'):
+        pdf.multi_cell(0, 7, txt=line)
+        
+    return pdf.output(dest="S").encode('latin-1')
+
 # 4. Search Execution
 if st.button("Generate Battle Card"):
     if not company_name:
@@ -97,7 +111,6 @@ if st.button("Generate Battle Card"):
                 c_info = get_waterfall_contact(target_name, domain, APOLLO_KEY, HUNTER_KEY)
                 contact_data_string = f"\nVERIFIED CONTACT FOUND:\n- Target: {target_name}\n- Email: {c_info['email']}\n- Phone: {c_info['phone']}\n- Data Source: {c_info['source']}\n"
             
-            # --- DYNAMIC INDUSTRY ROUTING ---
             industry_metrics = {
                 "Retail": "number of physical stores, e-commerce presence, and franchise vs owned model",
                 "Manufacturing": "number of manufacturing plants, production capacity, and key product lines",
@@ -141,23 +154,25 @@ if st.button("Generate Battle Card"):
                     
                     Provide a highly structured Battle Card tailored for the {industry} industry:
                     
-                    **1. 🏢 Company Profile & Footprint**
-                    * **Registered Head Office:** (Extract exact address from Google data).
-                    * **Operational Scale:** (Extract exact numbers focusing specifically on: {scale_focus}).
+                    1. Company Profile & Footprint
+                    * Registered Head Office: (Extract exact address from Google data).
+                    * Operational Scale: (Extract exact numbers focusing specifically on: {scale_focus}).
                     
-                    **2. 👤 Key Decision Makers (KDMs) & LinkedIn**
+                    2. Key Decision Makers (KDMs) & LinkedIn
                     * List the verified Names and Roles of top executives.
-                    * **LinkedIn:** Provide a direct URL format to search for them (e.g., https://www.linkedin.com/search/results/people/?keywords={company_name}+CEO).
+                    * LinkedIn: Provide a direct URL format to search for them.
                     
-                    **3. 📞 Direct Contact Intelligence**
+                    3. Direct Contact Intelligence
                     * (If VERIFIED CONTACT FOUND is listed above, print it here. If not, suggest the corporate email pattern based on their domain).
                     
-                    **4. 🎯 Strategic Sales Hooks**
+                    4. Strategic Sales Hooks
                     * 3 custom, highly targeted talking points for a Presales meeting based specifically on their {industry} operations and current scale.
                     """
                     response = model.generate_content(prompt)
+                    
                     st.success(f"Deep Vertical Report Ready! (Tailored for {industry})")
                     st.markdown(response.text)
+                    
                     # --- THE NEW DOWNLOAD BUTTON ---
                     pdf_bytes = create_pdf(response.text, company_name)
                     st.download_button(
@@ -166,6 +181,7 @@ if st.button("Generate Battle Card"):
                         file_name=f"{company_name.replace(' ', '_')}_PreSales_IQ.pdf",
                         mime="application/pdf"
                     )
+                    
                 else:
                     st.error("No compatible model found.")
             except Exception as e:
