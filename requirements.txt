@@ -3,3 +3,4 @@ streamlit
 requests
 serpapi
 fpdf
+supabase
