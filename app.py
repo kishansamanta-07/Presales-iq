@@ -3,6 +3,10 @@ import google.generativeai as genai
 import requests
 from fpdf import FPDF
 
+# --- NEW: INITIALIZE MEMORY VAULT ---
+if 'history' not in st.session_state:
+    st.session_state['history'] = []
+
 # 1. API Setup from Secrets
 try:
     GEMINI_KEY = st.secrets.get("GEMINI_KEY", "")
@@ -13,9 +17,23 @@ try:
 except Exception as e:
     st.error("Secrets configuration error.")
 
-st.set_page_config(page_title="Einstein's IQ", layout="centered")
-st.title("🚀 Einstein's IQ")
-st.markdown("### Powered by Kishan & Soumik")
+st.set_page_config(page_title="PreSales IQ", layout="wide") # Changed to 'wide' to make room for the sidebar
+
+# --- NEW: THE SIDEBAR VAULT ---
+with st.sidebar:
+    st.title("📚 History Vault")
+    st.markdown("Your previous Battle Cards from this session:")
+    if not st.session_state['history']:
+        st.info("No reports generated yet. Run a search to start saving!")
+    else:
+        # Show the newest reports at the top
+        for i, record in enumerate(reversed(st.session_state['history'])):
+            with st.expander(f"🏢 {record['company']} ({record['industry']})"):
+                st.markdown(record['report'])
+
+# Main Page UI
+st.title("🚀 PreSales IQ")
+st.markdown("### Powered by Google Search & Live Contact APIs")
 
 # 2. Search Inputs
 st.markdown("**Step 1: Company Intelligence**")
@@ -65,6 +83,9 @@ def get_waterfall_contact(name, company_domain, apollo_key, hunter_key):
         res = requests.post(apollo_url, json=payload).json()
         if 'person' in res and res['person']:
             contact_info['email'] = res['person'].get('email', "Not Found")
+            phones = res['person'].get('phone_numbers', [])
+            if phones:
+                contact_info['phone'] = str(phones[0].get('sanitized_number', phones[0])) if isinstance(phones[0], dict) else str(phones[0])
             contact_info['source'] = "Apollo.io"
     except:
         pass
@@ -81,17 +102,14 @@ def get_waterfall_contact(name, company_domain, apollo_key, hunter_key):
             
     return contact_info
 
-# --- NEW PDF GENERATOR FUNCTION ---
 def create_pdf(report_text, company):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(200, 10, txt=f"PreSales IQ Report: {company}", ln=True, align='C')
     pdf.ln(10)
-    
     pdf.set_font("Arial", size=11)
     
-    # Clean text to prevent PDF errors (remove markdown stars and emojis)
     clean_text = report_text.replace('**', '') 
     clean_text = clean_text.encode('latin-1', 'replace').decode('latin-1')
     
@@ -109,21 +127,21 @@ if st.button("Generate Battle Card"):
             contact_data_string = ""
             if target_name and domain:
                 c_info = get_waterfall_contact(target_name, domain, APOLLO_KEY, HUNTER_KEY)
-                contact_data_string = f"\nVERIFIED CONTACT FOUND:\n- Target: {target_name}\n- Email: {c_info['email']}\n- Phone: {c_info['phone']}\n- Data Source: {c_info['source']}\n"
+                contact_data_string = f"\nVERIFIED CONTACT FOUND:\n- Target: {target_name}\n- Email: {c_info['email']}\n- Direct Phone: {c_info['phone']}\n- Data Source: {c_info['source']}\n"
             
             industry_metrics = {
-                "Retail": "number of physical stores, e-commerce presence, and franchise vs owned model",
-                "Manufacturing": "number of manufacturing plants, production capacity, and key product lines",
-                "Distribution": "number of warehouses, distribution network span, and logistics scale",
-                "EPC": "major ongoing/completed projects, order book value, and operational regions",
-                "Healthcare": "hospital/clinic count, bed capacity, and key medical specialties",
-                "Auto-Detect": "general scale, employee count, and primary revenue streams"
+                "Retail": "number of physical stores, e-commerce presence",
+                "Manufacturing": "manufacturing plants, production capacity",
+                "Distribution": "warehouses, distribution network span",
+                "EPC": "major projects, order book value",
+                "Healthcare": "hospital/clinic count, bed capacity",
+                "Auto-Detect": "general scale, employee count"
             }
             
             industry_search_terms = {
                 "Retail": "number of stores",
                 "Manufacturing": "manufacturing plants capacity",
-                "Distribution": "warehouses logistics network",
+                "Distribution": "warehouses logistics",
                 "EPC": "major projects order book",
                 "Healthcare": "hospital beds clinics count",
                 "Auto-Detect": "company scale size"
@@ -132,7 +150,7 @@ if st.button("Generate Battle Card"):
             scale_focus = industry_metrics.get(industry, industry_metrics["Auto-Detect"])
             search_focus = industry_search_terms.get(industry, industry_search_terms["Auto-Detect"])
             
-            search_query = f"{company_name} {city} headquarters address {search_focus} CEO LinkedIn"
+            search_query = f"{company_name} {city} headquarters address corporate phone number {search_focus} CEO"
             live_data = get_live_google_data(search_query, SERPAPI_KEY)
 
             try:
@@ -144,7 +162,6 @@ if st.button("Generate Battle Card"):
                 
                 if safe_model:
                     model = genai.GenerativeModel(safe_model)
-                    
                     prompt = f"""
                     Act as an elite B2B Sales Intelligence Expert. 
                     Analyze '{company_name}' ({city}, {industry} sector).
@@ -158,22 +175,32 @@ if st.button("Generate Battle Card"):
                     * Registered Head Office: (Extract exact address from Google data).
                     * Operational Scale: (Extract exact numbers focusing specifically on: {scale_focus}).
                     
-                    2. Key Decision Makers (KDMs) & LinkedIn
+                    2. Key Decision Makers (KDMs)
                     * List the verified Names and Roles of top executives.
                     * LinkedIn: Provide a direct URL format to search for them.
                     
                     3. Direct Contact Intelligence
-                    * (If VERIFIED CONTACT FOUND is listed above, print it here. If not, suggest the corporate email pattern based on their domain).
+                    * Target KDM: {target_name if target_name else "Not Specified"}
+                    * Direct Email: (Print exactly what is in VERIFIED CONTACT FOUND. If not found, suggest corporate pattern).
+                    * Direct Phone: (Print exactly what is in VERIFIED CONTACT FOUND. If not found, write 'Not available via API').
+                    * HQ Phone: (Extract the general corporate phone number from the Google Data).
                     
                     4. Strategic Sales Hooks
-                    * 3 custom, highly targeted talking points for a Presales meeting based specifically on their {industry} operations and current scale.
+                    * 3 custom, highly targeted talking points for a Presales meeting based specifically on their {industry} operations.
                     """
                     response = model.generate_content(prompt)
                     
                     st.success(f"Deep Vertical Report Ready! (Tailored for {industry})")
                     st.markdown(response.text)
                     
-                    # --- THE NEW DOWNLOAD BUTTON ---
+                    # --- NEW: SAVE TO HISTORY VAULT ---
+                    st.session_state['history'].append({
+                        "company": company_name,
+                        "industry": industry,
+                        "report": response.text
+                    })
+                    
+                    # PDF Download Button
                     pdf_bytes = create_pdf(response.text, company_name)
                     st.download_button(
                         label="📄 Download PDF Report",
